@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Management</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: #f4f6f9;
+        }
+        .card {
+            border-radius: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container mt-5">
+
+    <div class="card shadow p-4">
+
+        <h4 class="mb-4 fw-bold">User Management</h4>
+
+        <table class="table table-hover align-middle">
+
+            <thead class="table-dark">
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            {% for user in users %}
+            <tr>
+
+                <td>{{ user.name }}</td>
+                <td>{{ user.email }}</td>
+
+                <td>
+                    {% if user.role == 'admin' %}
+                        <span class="badge bg-success">Admin</span>
+                    {% else %}
+                        <span class="badge bg-secondary">User</span>
+                    {% endif %}
+                </td>
+
+                <td>
+
+{% if user.role != 'admin' %}
+    <!-- MAKE ADMIN -->
+    <form method="POST" action="/make_admin/{{ user.email }}">
+        <button class="btn btn-warning btn-sm">
+            Make Admin
+        </button>
+    </form>
+
+{% else %}
+    <!-- REMOVE ADMIN -->
+    {% if user.email != session.get('email') %}
+    <form method="POST" action="/remove_admin/{{ user.email }}">
+        <button class="btn btn-danger btn-sm">
+            Remove Admin
+        </button>
+    </form>
+    {% else %}
+        <span class="badge bg-success">You</span>
+    {% endif %}
+{% endif %}
+
+</td>
+
+            </tr>
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+        <a href="/dashboard" class="btn btn-dark mt-3">Back to Dashboard</a>
+
+    </div>
+
+</div>
+
+</body>
+</html>
