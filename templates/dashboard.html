@@ -186,11 +186,11 @@ value="{{ request.args.get('search','') }}">
 
 <td>{{ complaint.created_at }}</td>
 
-<td>
-<a href="{{ url_for('static', filename='uploads/' + complaint.image) }}" target="_blank">
-<img src="{{ url_for('static', filename='uploads/' + complaint.image) }}" width="80">
-</a>
-</td>
+{% if complaint[5] %}
+<a href="{{ url_for('static', filename='uploads/' + complaint[5]) }}" target="_blank">View Image</a>
+{% else %}
+No Image
+{% endif %}
 
 <td>
 
