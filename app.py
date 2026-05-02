@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS complaints (
     severity TEXT,
     created_at TEXT,
     image TEXT,
-    user_email TEXT
+    user_email TEXT,
+    priority INTEGER,
+    category TEXT           
 )
 """)
 
@@ -54,6 +56,25 @@ db.commit()
 # ---------------- HELPER ----------------
 def generate_id():
     return "CMP" + str(random.randint(10000,99999))
+
+from datetime import datetime
+
+def calculate_priority(severity, created_at):
+    score = 0
+
+    # Severity weight
+    if severity == "High":
+        score += 3
+    elif severity == "Medium":
+        score += 2
+    else:
+        score += 1
+
+    # Time factor
+    days_old = (datetime.now() - created_at).days
+    score += days_old
+
+    return score
 
 # ---------------- HOME ----------------
 @app.route("/")
@@ -78,13 +99,13 @@ def register():
         password = generate_password_hash(request.form["password"])
         role = "user"
 
-        cursor.execute("SELECT * FROM users WHERE LOWER(email)=LOWER(%s)", (email,))
+        cursor.execute("SELECT * FROM users WHERE LOWER(email)=LOWER(?)", (email,))
         if cursor.fetchone():
             return render_template("register.html", error="Email already exists!")
 
         cursor.execute("""
             INSERT INTO users (name, email, password, role)
-            VALUES (%s, %s, %s, %s)
+            VALUES (?, ?, ?, ?)
         """, (name, email, password, role))
 
         db.commit()
@@ -102,14 +123,14 @@ def login():
         email = request.form["email"].lower()
         password = request.form["password"]
 
-        cursor.execute("SELECT * FROM users WHERE LOWER(email)=LOWER(%s)", (email,))
+        cursor.execute("SELECT * FROM users WHERE LOWER(email)=LOWER(?)", (email,))
         user = cursor.fetchone()
 
-        if user and check_password_hash(user["password"], password):
+        if user and check_password_hash(user[3], password):
 
-            session["user"] = user["name"]
-            session["email"] = user["email"]
-            session["role"] = user["role"]
+            session["user"] = user[1]
+            session["email"] = user[2]
+            session["role"] = user[4]
 
             return redirect("/category")
 
@@ -139,34 +160,35 @@ def dashboard():
         if search and status_filter:
             cursor.execute("""
                 SELECT * FROM complaints
-                WHERE (title LIKE %s OR status LIKE %s)
-                AND status=%s
-                ORDER BY id DESC
+                WHERE (title LIKE ? OR status LIKE ?)
+                AND status=?
+               ORDER BY priority DESC
             """, ('%' + search + '%', '%' + search + '%', status_filter))
 
         elif search:
             cursor.execute("""
                 SELECT * FROM complaints
-                WHERE title LIKE %s OR status LIKE %s
-                ORDER BY id DESC
+                WHERE title LIKE ? OR status LIKE ?
+                ORDER BY priority DESC
             """, ('%' + search + '%', '%' + search + '%'))
 
         elif status_filter:
             cursor.execute("""
                 SELECT * FROM complaints
-                WHERE status=%s
-                ORDER BY id DESC
+                WHERE status=?
+                ORDER BY priority DESC
             """, (status_filter,))
 
         else:
             category = session.get("category")
+
             if category:
                 cursor.execute(
-                    "SELECT * FROM complaints WHERE category=%s ORDER BY id DESC",
+                    "SELECT * FROM complaints WHERE category=? ORDER BY priority DESC",
                     (category,)
                 )
             else:
-                cursor.execute("SELECT * FROM complaints ORDER BY id DESC")
+                cursor.execute("SELECT * FROM complaints ORDER BY priority DESC")
 
     # ---------------- USER ----------------
     else:
@@ -174,32 +196,32 @@ def dashboard():
         if search and status_filter:
             cursor.execute("""
                 SELECT * FROM complaints 
-                WHERE user_email=%s 
-                AND (title LIKE %s OR status LIKE %s)
-                AND status=%s 
-                ORDER BY id DESC
-            """, (email, '%' + search + '%', '%' + search + '%', status_filter))
+                WHERE user_email=? AND category=?
+                AND (title LIKE ? OR status LIKE ?)
+                AND status=?
+                ORDER BY priority DESC
+            """, (email, category, '%' + search + '%', '%' + search + '%', status_filter))
 
         elif search:
             cursor.execute("""
                 SELECT * FROM complaints 
-                WHERE user_email=%s 
-                AND (title LIKE %s OR status LIKE %s)
-                ORDER BY id DESC
+                WHERE user_email=? AND category=?
+                AND (title LIKE ? OR status LIKE ?)
+                ORDER BY priority DESC
             """, (email, '%' + search + '%', '%' + search + '%'))
 
         elif status_filter:
             cursor.execute("""
                 SELECT * FROM complaints 
-                WHERE user_email=%s AND status=%s 
-                ORDER BY id DESC
+                WHERE user_email=? AND status=?
+                ORDER BY priority DESC
             """, (email, status_filter))
 
         else:
             cursor.execute("""
                 SELECT * FROM complaints 
-                WHERE user_email=%s 
-                ORDER BY id DESC
+                WHERE user_email=?
+                ORDER BY priority DESC
             """, (email,))
 
     complaints = cursor.fetchall()
@@ -207,23 +229,23 @@ def dashboard():
     # ---------- COUNTS ----------
     if role == "admin":
         cursor.execute("SELECT COUNT(*) as total FROM complaints")
-        total = cursor.fetchone()["total"]
+        total = cursor.fetchone()[0]
 
         cursor.execute("SELECT COUNT(*) as pending FROM complaints WHERE status='Pending'")
-        pending = cursor.fetchone()["pending"]
+        pending = cursor.fetchone()[0]
 
         cursor.execute("SELECT COUNT(*) as resolved FROM complaints WHERE status='Resolved'")
-        resolved = cursor.fetchone()["resolved"]
+        resolved = cursor.fetchone()[0]
 
     else:
-        cursor.execute("SELECT COUNT(*) as total FROM complaints WHERE user_email=%s", (email,))
-        total = cursor.fetchone()["total"]
+        cursor.execute("SELECT COUNT(*) as total FROM complaints WHERE user_email=?", (email,))
+        total = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(*) as pending FROM complaints WHERE user_email=%s AND status='Pending'", (email,))
-        pending = cursor.fetchone()["pending"]
+        cursor.execute("SELECT COUNT(*) as pending FROM complaints WHERE user_email=? AND status='Pending'", (email,))
+        pending = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(*) as resolved FROM complaints WHERE user_email=%s AND status='Resolved'", (email,))
-        resolved = cursor.fetchone()["resolved"]
+        cursor.execute("SELECT COUNT(*) as resolved FROM complaints WHERE user_email=? AND status='Resolved'", (email,))
+        resolved = cursor.fetchone()[0]
 
     return render_template("dashboard.html",
                            complaints=complaints,
@@ -262,22 +284,25 @@ def complaint():
 
         category = session.get("category")
 
+        from datetime import datetime
+
+        created_time = datetime.now()
+        priority = calculate_priority(severity, created_time)
+
         cursor.execute("""
-            INSERT INTO complaints
-            (complaint_id, user_name, user_email, location, title, description, image, status, severity, category)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-            cid,
-            user_name,        # name
-            user_email,       # email ✅
-            location,
-            title,
-            description,
-            filename,
-            "Pending",
-            severity,
-            category
-        ))
+        INSERT INTO complaints 
+        (title, status, severity, created_at, image, user_email, priority, category)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+        title,
+        "Pending",
+        severity,
+        created_time,
+        filename,
+        session["email"],
+        priority,
+        session.get("category")   # 🔥 THIS IS KEY
+))
 
         db.commit()
 
@@ -311,29 +336,33 @@ def update_status():
     id = request.form["id"]
     status = request.form["status"]
 
-    cursor.execute("UPDATE complaints SET status=%s WHERE id=%s", (status, id))
+    cursor.execute("UPDATE complaints SET status=? WHERE id=?", (status, id))
     db.commit()
 
-    cursor.execute("SELECT * FROM complaints WHERE id=%s", (id,))
+    cursor.execute("SELECT * FROM complaints WHERE id=?", (id,))
     complaint = cursor.fetchone()
 
     if complaint and status == "Resolved":
+        complaint_id = complaint[1]
+        title = complaint[2]
+        user_email = complaint[7]
+        status_val = complaint[3]
 
         msg = Message(
-            subject=f"Complaint {complaint['complaint_id']} Resolved",
-            sender=app.config['MAIL_USERNAME'],
-            recipients=[complaint["user_email"]]
-        )
+    subject=f"Complaint {complaint_id} Resolved",
+    sender=app.config['MAIL_USERNAME'],
+    recipients=[user_email]
+)
 
-        msg.body = f"""
-Complaint ID: {complaint['complaint_id']}
-Title: {complaint['title']}
-Status: {complaint['status']}
-"""
+    msg.body = f"""
+    Complaint ID: {complaint_id}
+    Title: {title}
+    Status: {status_val}
+    """
 
-        try:
+    try:
             mail.send(msg)
-        except Exception as e:
+    except Exception as e:
             print("Mail Error:", e)
 
     return redirect("/dashboard")
@@ -373,7 +402,7 @@ def make_admin(email):
         return redirect("/dashboard")
 
     cursor.execute(
-        "UPDATE users SET role='admin' WHERE email=%s",
+        "UPDATE users SET role='admin' WHERE email=?",
         (email,)
     )
     db.commit()
@@ -391,16 +420,6 @@ def users():
 
     return render_template("users.html", users=users)
 
-@app.route("/promote/<email>")
-def promote(email):
-
-    if session.get("role") != "admin":
-        return "Unauthorized"
-
-    cursor.execute("UPDATE users SET role='admin' WHERE email=%s", (email,))
-    db.commit()
-
-    return redirect("/users")
 
 @app.route("/remove_admin/<email>", methods=["POST"])
 def remove_admin(email):
@@ -412,7 +431,7 @@ def remove_admin(email):
         return redirect("/users")
 
     cursor.execute(
-        "UPDATE users SET role='user' WHERE email=%s",
+        "UPDATE users SET role='user' WHERE email=?",
         (email,)
     )
     db.commit()
@@ -420,7 +439,7 @@ def remove_admin(email):
     return redirect("/users")
 
 # ---------------- RUN ----------------
-    import os
+import os
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
