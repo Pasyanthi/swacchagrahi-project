@@ -150,6 +150,7 @@ def dashboard():
 
     role = session.get("role", "").strip().lower()
     email = session.get("email")
+    category = session.get("category")
 
     search = request.args.get("search")
     status_filter = request.args.get("status")
@@ -208,21 +209,21 @@ def dashboard():
                 WHERE user_email=? AND category=?
                 AND (title LIKE ? OR status LIKE ?)
                 ORDER BY priority DESC
-            """, (email, '%' + search + '%', '%' + search + '%'))
+            """, (email, category, '%' + search + '%', '%' + search + '%'))
 
         elif status_filter:
             cursor.execute("""
                 SELECT * FROM complaints 
-                WHERE user_email=? AND status=?
+                WHERE user_email=? AND category=? AND status=?
                 ORDER BY priority DESC
-            """, (email, status_filter))
+            """, (email, category, status_filter))
 
         else:
             cursor.execute("""
                 SELECT * FROM complaints 
-                WHERE user_email=?
+                WHERE user_email=? AND category=?
                 ORDER BY priority DESC
-            """, (email,))
+            """, (email, category))
 
     complaints = cursor.fetchall()
 
@@ -318,7 +319,10 @@ Title: {title}
 Status: Pending
 """
 
-        mail.send(msg)
+        try:
+            mail.send(msg)
+        except Exception as e:
+            print("Mail Error:", e)
 
         flash("Complaint submitted successfully!")
 
