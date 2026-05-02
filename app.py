@@ -79,7 +79,7 @@ def calculate_priority(severity, created_at):
 # ---------------- HOME ----------------
 @app.route("/")
 def home():
-    return render_template("home.html")
+    return render_template("home.html") + "<h2>UPDATED VERSION</h2>"
 
 # ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
@@ -442,9 +442,7 @@ def remove_admin(email):
 
     return redirect("/users")
 
-@app.route("/")
-def home():
-    return "HELLO TEST VERSION"
+
 
 # ---------------- RUN ----------------
 import os
