@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-import mysql.connector
+import sqlite3
 import random
 import os
 from werkzeug.utils import secure_filename
@@ -23,18 +23,33 @@ UPLOAD_FOLDER = os.path.join(os.getcwd(), "static", "uploads")
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # ---------------- DATABASE ----------------
-db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="root123",
-    database="swacchagrahi_db"
+db = sqlite3.connect("database.db", check_same_thread=False)
+cursor = db.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    email TEXT UNIQUE,
+    password TEXT,
+    role TEXT
 )
+""")
 
-cursor = db.cursor(dictionary=True)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS complaints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    complaint_id TEXT,
+    title TEXT,
+    status TEXT,
+    severity TEXT,
+    created_at TEXT,
+    image TEXT,
+    user_email TEXT
+)
+""")
 
-# DEBUG (put AFTER cursor creation)
-cursor.execute("SELECT DATABASE()")
-print("APP DB:", cursor.fetchone())
+db.commit()
 
 # ---------------- HELPER ----------------
 def generate_id():
