@@ -79,7 +79,7 @@ def calculate_priority(severity, created_at):
 # ---------------- HOME ----------------
 @app.route("/")
 def home():
-    return render_template("home.html") + "<h2>UPDATED VERSION</h2>"
+    return render_template("home.html") 
 
 # ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
