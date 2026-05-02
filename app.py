@@ -442,6 +442,10 @@ def remove_admin(email):
 
     return redirect("/users")
 
+@app.route("/")
+def home():
+    return "HELLO TEST VERSION"
+
 # ---------------- RUN ----------------
 import os
 
