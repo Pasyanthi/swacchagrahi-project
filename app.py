@@ -255,78 +255,53 @@ def dashboard():
                            resolved=resolved)
 
 # ---------------- COMPLAINT ----------------
-@app.route("/complaint", methods=["GET","POST"])
+from datetime import datetime
+import uuid
+
+@app.route("/complaint", methods=["GET", "POST"])
 def complaint():
 
-    if not session.get("user"):
-        return redirect("/login")
-
     if request.method == "POST":
-
-        cid = generate_id()
-
-        user_email = session["email"]
-        user_name = session["user"]
-
-        location = request.form.get("location")
-        title = request.form.get("title")
-        description = request.form.get("description")
-        severity = request.form.get("severity")
-        image = request.files.get("image")
-
-        if not location or not title or not description or not severity:
-            return "All fields are required!"
-
-        if not image or image.filename == "":
-            return "Please upload an image!"
-
-        filename = secure_filename(image.filename)
-        image.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-
-        category = session.get("category")
-
-        from datetime import datetime
-
-        created_time = datetime.now()
-        priority = calculate_priority(severity, created_time)
-
-        cursor.execute("""
-        INSERT INTO complaints 
-        (title, status, severity, created_at, image, user_email, priority, category)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-        title,
-        "Pending",
-        severity,
-        created_time,
-        filename,
-        session["email"],
-        priority,
-        session.get("category")   # 🔥 THIS IS KEY
-))
-
-        db.commit()
-
-        msg = Message(
-            "Complaint Submitted",
-            sender=app.config['MAIL_USERNAME'],
-            recipients=[user_email]
-        )
-
-        msg.body = f"""
-Complaint ID: {cid}
-Title: {title}
-Status: Pending
-"""
-
         try:
-            mail.send(msg)
+            title = request.form["title"]
+            severity = request.form["severity"]
+
+            # Handle image
+            image = request.files["image"]
+            filename = None
+
+            if image and image.filename != "":
+                filename = str(uuid.uuid4()) + "_" + image.filename
+                image.save("static/uploads/" + filename)
+
+            created_time = datetime.now()
+            priority = calculate_priority(severity, created_time)
+
+            cursor.execute("""
+                INSERT INTO complaints 
+                (complaint_id, title, status, severity, created_at, image, user_email, priority, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                str(uuid.uuid4())[:8],
+                title,
+                "Pending",
+                severity,
+                created_time,
+                filename,
+                session.get("email"),
+                priority,
+                session.get("category")
+            ))
+
+            db.commit()
+
+            flash("Complaint submitted successfully!")
+
+            return redirect("/dashboard")
+
         except Exception as e:
-            print("Mail Error:", e)
-
-        flash("Complaint submitted successfully!")
-
-        return redirect("/dashboard")
+            print("ERROR:", e)
+            return "Error submitting complaint"
 
     return render_template("complaint.html")
 
