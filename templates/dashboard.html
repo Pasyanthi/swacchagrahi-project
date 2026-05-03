@@ -40,17 +40,17 @@ body {
 
     <div class="ms-auto">
 
-      {% if session.get('role') == 'admin' %}
-      <a href="/users" class="btn btn-info btn-sm me-2">Manage Users</a>
-      {% endif %}
+        {% if session.get('role') == 'admin' %}
+        <a href="/users" class="btn btn-info btn-sm me-2">Manage Users</a>
+        {% endif %}
 
-      {% if session.get('role') and session.get('role')|lower == 'user' %}
-      <a href="/complaint" class="btn btn-success btn-sm me-2">
-          Submit Complaint
-      </a>
-      {% endif %}
+        {% if session.get('role') and session.get('role')|lower == 'user' %}
+        <a href="/complaint" class="btn btn-success btn-sm me-2">
+            Submit Complaint
+        </a>
+        {% endif %}
 
-      <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+        <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
     </div>
 </nav>
 
@@ -64,31 +64,34 @@ body {
 {% endif %}
 {% endwith %}
 
+<!-- STATS -->
 <div class="row mb-4 text-center">
-<div class="col-md-4">
-<div class="card p-3">
-<h6>Total Complaints</h6>
-<h3>{{ total }}</h3>
-</div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6>Total Complaints</h6>
+            <h3>{{ total }}</h3>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="text-danger">Pending</h6>
+            <h3>{{ pending }}</h3>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="text-success">Resolved</h6>
+            <h3>{{ resolved }}</h3>
+        </div>
+    </div>
 </div>
 
-<div class="col-md-4">
-<div class="card p-3">
-<h6 class="text-danger">Pending</h6>
-<h3>{{ pending }}</h3>
-</div>
-</div>
-
-<div class="col-md-4">
-<div class="card p-3">
-<h6 class="text-success">Resolved</h6>
-<h3>{{ resolved }}</h3>
-</div>
-</div>
-</div>
-
+<!-- FILTER -->
 <div class="filter-box mb-4">
 <form method="GET" action="/dashboard" class="row g-2">
+
 <div class="col-md-6">
 <input type="text" name="search" class="form-control"
 placeholder="Search complaints..."
@@ -106,9 +109,11 @@ value="{{ request.args.get('search','') }}">
 <div class="col-md-3 d-grid">
 <button class="btn btn-dark">Apply</button>
 </div>
+
 </form>
 </div>
 
+<!-- TABLE -->
 <div class="card">
 <div class="card-body">
 
@@ -133,17 +138,22 @@ value="{{ request.args.get('search','') }}">
 
 <tr>
 
-<td>{{ complaint[0] }}</td> <!-- ID -->
-<td>{{ complaint[1] }}</td> <!-- Title -->
+<!-- ID -->
+<td>{{ complaint[0] }}</td>
 
+<!-- TITLE -->
+<td>{{ complaint[1] }}</td>
+
+<!-- STATUS -->
 <td>
-{% if complaint[4] == "Pending" %}
+{% if complaint[2] == "Pending" %}
 <span class="badge bg-danger">Pending</span>
 {% else %}
 <span class="badge bg-success">Resolved</span>
 {% endif %}
 </td>
 
+<!-- SEVERITY -->
 <td>
 {% if complaint[3] == "High" %}
 <span class="badge bg-danger">High</span>
@@ -154,21 +164,25 @@ value="{{ request.args.get('search','') }}">
 {% endif %}
 </td>
 
-<td>{{ complaint[6] }}</td> <!-- Date -->
+<!-- DATE -->
+<td>{{ complaint[4] }}</td>
 
+<!-- IMAGE -->
 <td>
 {% if complaint[5] %}
 <a href="{{ url_for('static', filename='uploads/' + complaint[5]) }}" target="_blank">
-<img src="{{ url_for('static', filename='uploads/' + complaint[5]) }}" width="80">
+<img src="{{ url_for('static', filename='uploads/' + complaint[5]) }}"
+     width="80"
+     onerror="this.style.display='none'">
 </a>
 {% else %}
 No Image
 {% endif %}
 </td>
 
+<!-- ACTION -->
 <td>
 {% if session.get('role') == 'admin' %}
-
 <form method="POST" action="/update_status">
 <input type="hidden" name="id" value="{{ complaint[0] }}">
 
@@ -179,26 +193,30 @@ No Image
 
 <button class="btn btn-primary btn-sm">Update</button>
 </form>
-
+{% else %}
+-
 {% endif %}
 </td>
 
 </tr>
 
 {% endfor %}
-
 {% else %}
+
 <tr>
 <td colspan="7" class="text-center">No complaints yet</td>
 </tr>
+
 {% endif %}
 
 </tbody>
+
 </table>
 
 </div>
 </div>
 
 </div>
+
 </body>
 </html>
